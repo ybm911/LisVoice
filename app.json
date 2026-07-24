@@ -4,22 +4,21 @@
     "slug": "ting-sheng",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "package": "com.tingsheng.app",
+      "icon": "./assets/app-icon.png",
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.VIBRATE"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#171C2D",
+        "foregroundImage": "./assets/app-icon.png"
       },
       "predictiveBackGestureEnabled": false
     },
