@@ -2,10 +2,6 @@
 
 听声是一款面向老年听障用户的 Android 实时字幕应用。它通过手机麦克风采集 16 kHz 单声道 PCM 音频，并使用阿里云百炼 Qwen-ASR Realtime 将身边说话内容实时显示为大字字幕。
 
-<p align="center">
-  <img src="assets/app-icon.png" alt="听声应用图标" width="160" />
-</p>
-
 ## 界面预览
 
 <table>
