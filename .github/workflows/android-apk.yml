@@ -1,0 +1,85 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-arm-apk:
+    name: Build ARM APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Set Android version code
+        run: sed -i -E "s/versionCode [0-9]+/versionCode ${GITHUB_RUN_NUMBER}/" android/app/build.gradle
+
+      - name: Build release APK for ARM devices
+        working-directory: android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
+
+      - name: Prepare APK artifact
+        id: package
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          mkdir -p artifacts
+          APK_NAME="LisVoice-v${VERSION}-arm.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "artifacts/${APK_NAME}"
+          echo "apk_name=${APK_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify APK contains ARM only
+        run: |
+          APK="artifacts/${{ steps.package.outputs.apk_name }}"
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/'
+          unzip -l "$APK" | grep -q 'lib/armeabi-v7a/'
+          if unzip -l "$APK" | grep -Eq 'lib/(x86|x86_64)/'; then
+            echo "x86 native libraries were unexpectedly included"
+            exit 1
+          fi
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LisVoice-ARM-APK
+          path: artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.apk
+          generate_release_notes: true
