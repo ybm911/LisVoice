@@ -23,12 +23,21 @@ import LiveSpeech, {
   type SpeechStateEvent,
   type TranscriptEvent,
 } from './modules/live-speech/src/LiveSpeechModule';
+import {
+  DEFAULT_APP_VERSION,
+  DEFAULT_ENDPOINT,
+  DEFAULT_MODEL,
+  initialConfig,
+  isNewerVersion,
+  normalizeConnectionConfig,
+  SETTINGS_KEY,
+  type ConnectionConfig,
+  type ThemeMode,
+  type TranscriptWeight,
+} from './src/config/appConfig';
 
-const SETTINGS_KEY = 'ting-sheng.connection.v1';
-const DEFAULT_ENDPOINT = 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime';
-const DEFAULT_MODEL = 'qwen3-asr-flash-realtime';
 const GITHUB_RELEASES_URL = 'https://api.github.com/repos/ybm911/LisVoice/releases/latest';
-const CURRENT_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+const CURRENT_VERSION = Constants.expoConfig?.version ?? DEFAULT_APP_VERSION;
 
 type GitHubRelease = {
   tag_name: string;
@@ -38,36 +47,6 @@ type GitHubRelease = {
     name: string;
     browser_download_url: string;
   }>;
-};
-
-type ThemeMode = 'system' | 'light' | 'dark';
-type TranscriptWeight = '500' | '700' | '800';
-
-function versionParts(version: string) {
-  return version.replace(/^v/i, '').split('.').map((part) => Number.parseInt(part, 10) || 0);
-}
-
-function isNewerVersion(latest: string, current: string) {
-  const latestParts = versionParts(latest);
-  const currentParts = versionParts(current);
-  const length = Math.max(latestParts.length, currentParts.length);
-  for (let index = 0; index < length; index += 1) {
-    const latestPart = latestParts[index] ?? 0;
-    const currentPart = currentParts[index] ?? 0;
-    if (latestPart !== currentPart) return latestPart > currentPart;
-  }
-  return false;
-}
-
-type ConnectionConfig = {
-  apiKey: string;
-  endpoint: string;
-  model: string;
-  haptics: boolean;
-  themeMode: ThemeMode;
-  transcriptFontSize: number;
-  transcriptFontWeight: TranscriptWeight;
-  minSoundDb: number;
 };
 
 type Palette = {
@@ -82,17 +61,6 @@ type Palette = {
   danger: string;
   input: string;
   shadow: string;
-};
-
-const initialConfig: ConnectionConfig = {
-  apiKey: '',
-  endpoint: DEFAULT_ENDPOINT,
-  model: DEFAULT_MODEL,
-  haptics: true,
-  themeMode: 'system',
-  transcriptFontSize: 34,
-  transcriptFontWeight: '700',
-  minSoundDb: -52,
 };
 
 const lightPalette: Palette = {
@@ -216,11 +184,16 @@ export default function App() {
     SecureStore.getItemAsync(SETTINGS_KEY)
       .then((value) => {
         if (value) {
-          const stored = { ...initialConfig, ...JSON.parse(value) } as ConnectionConfig;
-          setConfig(stored);
-          setDraft(stored);
-          setShowSettings(!stored.apiKey);
-          setStatusMessage(stored.apiKey ? '准备就绪' : '请先填写百炼 API Key');
+          try {
+            const parsed = JSON.parse(value) as Partial<ConnectionConfig>;
+            const stored = normalizeConnectionConfig(parsed);
+            setConfig(stored);
+            setDraft(stored);
+            setShowSettings(!stored.apiKey);
+            setStatusMessage(stored.apiKey ? '准备就绪' : '请先填写百炼 API Key');
+          } catch {
+            setStatusMessage('本机配置损坏，请重新填写');
+          }
         }
       })
       .catch(() => setStatusMessage('无法读取本机设置，请重新填写'))
@@ -287,12 +260,12 @@ export default function App() {
   }, [handleTranscript]);
 
   const saveSettings = async () => {
-    const normalized = {
+    const normalized = normalizeConnectionConfig({
       ...draft,
       apiKey: draft.apiKey.trim(),
       endpoint: draft.endpoint.trim(),
       model: draft.model.trim(),
-    };
+    });
     if (!normalized.apiKey || !normalized.endpoint || !normalized.model) {
       Alert.alert('还差一点', '请填写 API Key、服务端点和模型名称。');
       return;
@@ -337,6 +310,7 @@ export default function App() {
         return;
       }
 
+      const downloadUrl = apk?.browser_download_url ?? release.html_url;
       Alert.alert(
         '发现新版本',
         `当前版本：${CURRENT_VERSION}\n最新版本：${latestVersion}\n\n是否前往下载？`,
@@ -344,7 +318,9 @@ export default function App() {
           { text: '稍后', style: 'cancel' },
           {
             text: '下载更新',
-            onPress: () => Linking.openURL(apk?.browser_download_url ?? release.html_url),
+            onPress: () => {
+              Linking.openURL(downloadUrl).catch(() => Alert.alert('打开链接失败', '请手动复制链接后在浏览器打开。'));
+            },
           },
         ],
       );
@@ -364,22 +340,22 @@ export default function App() {
       openSettings();
       return;
     }
-    const permission = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, {
-      title: '允许“听声”使用麦克风',
-      message: '听声需要用麦克风把身边说话内容实时显示成文字。',
-      buttonPositive: '允许',
-      buttonNegative: '暂不允许',
-    });
-    if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
-      setSpeechState('error');
-      setStatusMessage('需要麦克风权限才能开始聆听');
-      return;
-    }
-
-    setConfirmedText('');
-    setPartialText('');
-    partialRef.current = '';
     try {
+      const permission = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, {
+        title: '允许“听声”使用麦克风',
+        message: '听声需要用麦克风把身边说话内容实时显示成文字。',
+        buttonPositive: '允许',
+        buttonNegative: '暂不允许',
+      });
+      if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+        setSpeechState('error');
+        setStatusMessage('需要麦克风权限才能开始聆听');
+        return;
+      }
+
+      setConfirmedText('');
+      setPartialText('');
+      partialRef.current = '';
       LiveSpeech.start(config.apiKey, config.endpoint, config.model, config.minSoundDb);
     } catch (error) {
       setSpeechState('error');
