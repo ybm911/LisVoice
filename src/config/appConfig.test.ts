@@ -22,6 +22,7 @@ describe('appConfig', () => {
       transcriptFontWeight: '700',
       transcriptFontSize: 48,
       minSoundDb: -20,
+      fullscreenListening: true,
     });
   });
 
@@ -37,6 +38,7 @@ describe('appConfig', () => {
       haptics: true,
       transcriptFontWeight: '700',
       minSoundDb: -52,
+      fullscreenListening: true,
     });
   });
 });

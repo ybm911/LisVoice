@@ -171,6 +171,8 @@ export default function App() {
     || (displayedConfig.themeMode === 'system' && systemColorScheme === 'dark');
   const palette = isDark ? darkPalette : lightPalette;
   const styles = useMemo(() => createStyles(palette), [palette]);
+  const isListening = speechState === 'listening' || speechState === 'connecting';
+  const isFullscreenListening = isListening && config.fullscreenListening;
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(palette.background).catch(() => undefined);
@@ -372,12 +374,10 @@ export default function App() {
     );
   }
 
-  const isListening = speechState === 'listening' || speechState === 'connecting';
   const statusColor = speechState === 'error' ? palette.danger : isListening ? palette.primary : palette.textMuted;
   const meterColor = audioLevel > 0.72 ? '#E05243' : isAboveThreshold ? '#25A86B' : palette.border;
   const thresholdPosition = `${Math.max(0, Math.min(100, ((config.minSoundDb + 70) / 70) * 100))}%` as `${number}%`;
   const transcript = confirmedText || partialText;
-
   return (
     <View style={styles.screen}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -408,6 +408,19 @@ export default function App() {
               palette={palette}
               value={draft.themeMode}
             />
+
+            <View style={styles.switchRow}>
+              <View style={styles.switchCopy}>
+                <Text style={styles.switchTitle}>全屏聆听</Text>
+                <Text style={styles.switchHint}>聆听时隐藏辅助信息，让字幕占据更大范围</Text>
+              </View>
+              <Switch
+                accessibilityLabel="全屏聆听"
+                onValueChange={(fullscreenListening) => setDraft((current) => ({ ...current, fullscreenListening }))}
+                trackColor={{ false: palette.border, true: palette.primary }}
+                value={draft.fullscreenListening}
+              />
+            </View>
 
             <Text style={styles.label}>字幕大小</Text>
             <ChoiceGroup
@@ -538,40 +551,56 @@ export default function App() {
           </Pressable>
         </ScrollView>
       ) : (
-        <View style={styles.mainContent}>
-          <View style={styles.header}>
-            <View style={styles.headerCopy}>
-              <Text style={styles.appName}>听声</Text>
-              <Text style={styles.tagline}>把身边的声音，变成看得见的话</Text>
-            </View>
-            <Pressable accessibilityLabel="打开设置" accessibilityRole="button" onPress={openSettings} style={styles.settingsButton}>
-              <Text style={styles.settingsButtonText}>设置</Text>
-            </Pressable>
-          </View>
+        <View style={[styles.mainContent, isFullscreenListening && styles.mainContentListening]}>
+          {!isFullscreenListening ? (
+            <>
+              <View style={styles.header}>
+                <View style={styles.headerCopy}>
+                  <Text style={styles.appName}>听声</Text>
+                  <Text style={styles.tagline}>把身边的声音，变成看得见的话</Text>
+                </View>
+                <Pressable accessibilityLabel="打开设置" accessibilityRole="button" onPress={openSettings} style={styles.settingsButton}>
+                  <Text style={styles.settingsButtonText}>设置</Text>
+                </Pressable>
+              </View>
 
-          <View style={styles.statusCard}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-            <Text selectable style={[styles.statusText, { color: statusColor }]}>{statusMessage}</Text>
-          </View>
+              <View style={styles.statusCard}>
+                <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                <Text selectable style={[styles.statusText, { color: statusColor }]}>{statusMessage}</Text>
+              </View>
 
-          <View style={styles.meterCard}>
-            <View style={styles.meterHeader}>
-              <Text style={styles.meterLabel}>环境音量</Text>
-              <Text style={styles.meterValue}>{isListening ? `${Math.round(audioDb)} dB` : '未聆听'}</Text>
+              <View style={styles.meterCard}>
+                <View style={styles.meterHeader}>
+                  <Text style={styles.meterLabel}>环境音量</Text>
+                  <Text style={styles.meterValue}>{isListening ? `${Math.round(audioDb)} dB` : '未聆听'}</Text>
+                </View>
+                <View style={styles.meterTrack}>
+                  <View style={[styles.meterFill, { backgroundColor: meterColor, width: `${Math.max(2, audioLevel * 100)}%` as `${number}%` }]} />
+                  <View style={[styles.thresholdMarker, { left: thresholdPosition }]} />
+                </View>
+                <View style={styles.meterLegend}>
+                  <Text style={styles.meterHint}>安静</Text>
+                  <Text style={styles.meterHint}>红色表示声音较大</Text>
+                </View>
+              </View>
+            </>
+          ) : null}
+
+          {isFullscreenListening ? (
+            <View pointerEvents="none" style={styles.meterDock}>
+              <View style={styles.meterDockTrack}>
+                <View style={[styles.meterDockFill, { backgroundColor: meterColor, height: `${Math.max(8, audioLevel * 100)}%` as `${number}%` }]} />
+              </View>
             </View>
-            <View style={styles.meterTrack}>
-              <View style={[styles.meterFill, { backgroundColor: meterColor, width: `${Math.max(2, audioLevel * 100)}%` as `${number}%` }]} />
-              <View style={[styles.thresholdMarker, { left: thresholdPosition }]} />
-            </View>
-            <View style={styles.meterLegend}>
-              <Text style={styles.meterHint}>安静</Text>
-              <Text style={styles.meterHint}>红色表示声音较大</Text>
-            </View>
-          </View>
+          ) : null}
 
           <View style={styles.transcriptCard}>
             <ScrollView
-              contentContainerStyle={[styles.transcriptScrollContent, !transcript && styles.transcriptEmptyContent]}
+              contentContainerStyle={[
+                styles.transcriptScrollContent,
+                isFullscreenListening && styles.transcriptScrollContentFullscreen,
+                !transcript && styles.transcriptEmptyContent,
+              ]}
               onContentSizeChange={() => transcriptScrollRef.current?.scrollToEnd({ animated: true })}
               ref={transcriptScrollRef}
               showsVerticalScrollIndicator={false}
@@ -600,16 +629,22 @@ export default function App() {
             </ScrollView>
           </View>
 
-          <Pressable
-            accessibilityLabel={isListening ? '暂停聆听' : '开始聆听'}
-            accessibilityRole="button"
-            onPress={isListening ? () => LiveSpeech.stop() : startListening}
-            style={[styles.listenButton, isListening && styles.stopButton]}
-          >
-            <Text style={styles.listenButtonText}>{isListening ? '暂停聆听' : '开始聆听'}</Text>
-          </Pressable>
+          <View style={[styles.listenButtonWrap, isFullscreenListening && styles.listenButtonWrapFullscreen]}>
+            <Pressable
+              accessibilityLabel={isListening ? '停止聆听' : '开始聆听'}
+              accessibilityRole="button"
+              onPress={isListening ? () => LiveSpeech.stop() : startListening}
+              style={[styles.listenButton, isListening && styles.stopButton, isFullscreenListening && styles.stopButtonCircle]}
+            >
+              <Text style={isFullscreenListening ? styles.stopGlyph : styles.listenButtonText}>
+                {isFullscreenListening ? '■' : isListening ? '停止聆听' : '开始聆听'}
+              </Text>
+            </Pressable>
+          </View>
 
-          <Text style={styles.footerNote}>实时识别需要网络连接，请勿在危险场景中只依赖本应用。</Text>
+          {!isFullscreenListening ? (
+            <Text style={styles.footerNote}>实时识别需要网络连接，请勿在危险场景中只依赖本应用。</Text>
+          ) : null}
         </View>
       )}
     </View>
@@ -628,7 +663,8 @@ function createStyles(palette: Palette) {
     screen: { backgroundColor: palette.background, flex: 1 },
     loading: { alignItems: 'center', backgroundColor: palette.background, flex: 1, justifyContent: 'center' },
     loadingText: { color: palette.text, fontSize: 20, fontWeight: '700' },
-    mainContent: { flex: 1, gap: 12, paddingBottom: 22, paddingHorizontal: 18, paddingTop: 48 },
+    mainContent: { flex: 1, gap: 8, paddingBottom: 18, paddingHorizontal: 18, paddingTop: 48 },
+    mainContentListening: { gap: 8, paddingBottom: 12, paddingHorizontal: 12, paddingTop: 24 },
     header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
     headerCopy: { flex: 1, paddingRight: 12 },
     appName: { color: palette.text, fontSize: 36, fontWeight: '800', letterSpacing: 1 },
@@ -647,17 +683,25 @@ function createStyles(palette: Palette) {
     thresholdMarker: { backgroundColor: palette.text, height: 14, opacity: 0.75, position: 'absolute', top: -2, width: 2 },
     meterLegend: { flexDirection: 'row', justifyContent: 'space-between' },
     meterHint: { color: palette.textMuted, fontSize: 11, fontWeight: '600' },
+    meterDock: { alignItems: 'center', left: 3, position: 'absolute', top: '48%', width: 16, zIndex: 4 },
+    meterDockTrack: { backgroundColor: palette.surfaceMuted, borderRadius: 4, height: 84, justifyContent: 'flex-end', overflow: 'hidden', width: 5 },
+    meterDockFill: { borderRadius: 4, minHeight: 7, width: '100%' },
     transcriptCard: { backgroundColor: palette.surface, borderCurve: 'continuous', borderRadius: 22, boxShadow: `0 3px 12px ${palette.shadow}`, flex: 1, minHeight: 250, overflow: 'hidden' },
     transcriptScrollContent: { padding: 20 },
+    transcriptScrollContentFullscreen: { paddingBottom: 104 },
     transcriptEmptyContent: { flexGrow: 1 },
     transcriptText: { color: palette.text, letterSpacing: 0.3 },
     partialText: { color: palette.primary },
     emptyTranscript: { alignItems: 'center', flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
     emptyTitle: { color: palette.text, fontSize: 23, fontWeight: '800', textAlign: 'center' },
     emptyBody: { color: palette.textMuted, fontSize: 16, lineHeight: 24, marginTop: 10, textAlign: 'center' },
-    listenButton: { alignItems: 'center', backgroundColor: palette.primary, borderCurve: 'continuous', borderRadius: 21, justifyContent: 'center', marginTop: 8, minHeight: 72 },
+    listenButtonWrap: { alignSelf: 'stretch', height: 72, marginTop: 4 },
+    listenButtonWrapFullscreen: { bottom: 28, height: 64, marginTop: 0, position: 'absolute', right: 28, width: 64, zIndex: 5 },
+    listenButton: { alignItems: 'center', backgroundColor: palette.primary, borderCurve: 'continuous', borderRadius: 21, flex: 1, justifyContent: 'center', width: '100%' },
     stopButton: { backgroundColor: palette.danger },
+    stopButtonCircle: { borderRadius: 32 },
     listenButtonText: { color: '#FFFFFF', fontSize: 25, fontWeight: '800' },
+    stopGlyph: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', lineHeight: 24 },
     footerNote: { color: palette.textMuted, fontSize: 12, lineHeight: 17, paddingHorizontal: 8, textAlign: 'center' },
     settingsContent: { gap: 16, paddingBottom: 40, paddingHorizontal: 18, paddingTop: 48 },
     settingsHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },

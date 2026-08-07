@@ -18,9 +18,12 @@
 ## 主要功能
 
 - 真正的实时流式语音识别
-- 固定字幕区域与自动滚动
+- 固定字幕区域与自动滚动，长时间聆听不会无限扩展页面
+- 可选全屏聆听模式，隐藏辅助信息并最大化字幕显示范围
+- 全屏模式提供左侧紧凑音量指示和悬浮停止按钮
+- 可随时关闭全屏模式，使用保留标题、状态与横向音量条的传统布局
 - 逐字轻震动提示
-- 实时环境音量条
+- 实时环境音量条，以绿色和红色提示声音强弱
 - 可调声音过滤阈值，减少安静环境中的误识别
 - 跟随系统、浅色与深色主题
 - 可调字幕大小和粗细
@@ -46,6 +49,8 @@ npm run android
 
 首次启动后，在设置中填写百炼 API Key、WebSocket 服务端点和模型名称。
 
+在“显示”设置中可以选择主题、字幕大小、字幕粗细和全屏聆听模式。全屏聆听默认开启；关闭后，聆听过程中仍会显示标题、连接状态和完整环境音量条。
+
 ## GitHub Actions 构建 APK
 
 仓库中的 `Build Android APK` 工作流会在以下场景运行：
@@ -63,14 +68,14 @@ npm run android
 
 ## 发布新版本
 
-先修改 `app.json` 中的版本号，例如从 `1.0.0` 改为 `1.0.1`，然后提交并创建同版本标签：
+先同步修改 `app.json`、`package.json` 和 `package-lock.json` 中的版本号，然后提交并创建同版本标签：
 
 ```bash
-git add app.json
-git commit -m "release: v1.0.1"
-git tag v1.0.1
+git add app.json package.json package-lock.json
+git commit -m "release: v1.0.2"
+git tag v1.0.2
 git push origin main
-git push origin v1.0.1
+git push origin v1.0.2
 ```
 
 GitHub Actions 完成后，APK 会出现在仓库的 Releases 页面。应用内的“检查更新”会读取最新 Release，并引导用户下载其中的 APK。

@@ -1,7 +1,7 @@
 export const SETTINGS_KEY = 'ting-sheng.connection.v1';
 export const DEFAULT_ENDPOINT = 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime';
 export const DEFAULT_MODEL = 'qwen3-asr-flash-realtime';
-export const DEFAULT_APP_VERSION = '1.0.1';
+export const DEFAULT_APP_VERSION = '1.0.2';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type TranscriptWeight = '500' | '700' | '800';
@@ -15,6 +15,7 @@ export type ConnectionConfig = {
   transcriptFontSize: number;
   transcriptFontWeight: TranscriptWeight;
   minSoundDb: number;
+  fullscreenListening: boolean;
 };
 
 export const initialConfig: ConnectionConfig = {
@@ -26,6 +27,7 @@ export const initialConfig: ConnectionConfig = {
   transcriptFontSize: 34,
   transcriptFontWeight: '700',
   minSoundDb: -52,
+  fullscreenListening: true,
 };
 
 export function versionParts(version: string) {
@@ -66,5 +68,6 @@ export function normalizeConnectionConfig(input: Partial<ConnectionConfig> | nul
     transcriptFontSize: Math.max(24, Math.min(48, Math.round(transcriptFontSize))),
     transcriptFontWeight,
     minSoundDb: Math.max(-70, Math.min(-20, Math.round(minSoundDb))),
+    fullscreenListening: typeof source.fullscreenListening === 'boolean' ? source.fullscreenListening : initialConfig.fullscreenListening,
   };
 }
